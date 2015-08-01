@@ -1,8 +1,8 @@
-function [ocean_diffusivity,aerosol_k,totForcing,y,GISS_temp,z_mixed]=TuneDiffusiveClimateModel(climsens,aerosol_k,Ndeepboxes,z_mixed,tune_aerosol_k,tune_z_mixed);
+function [ocean_diffusivity,aerosol_k,totForcing,y,GISS_temp,z_mixed,GISS_years]=TuneDiffusiveClimateModel(climsens,aerosol_k,Ndeepboxes,z_mixed,tune_aerosol_k,tune_z_mixed);
 
 %
 %
-% Last updated by  Bob Kopp, robert-dot-kopp-at-rutgers-dot-edu, Sat Oct 13 14:59:46 EDT 2012
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Fri Jul 31 16:24:51 EDT 2015
 
 defval('climsens',3);
 defval('aerosol_k',1);
@@ -547,6 +547,8 @@ GISS_OtherRF = GISS_OtherRF(41:end-1);
 GISS_temp = GISS_temp(41:end);
 GISS_temp = GISS_temp - GISS_temp(1);
 
+GISS_years=GISS_years(41:end);
+
 fitoptions=optimset('Display','iter','algorithm','sqp','TolX',1e-10,'TolFun',1e-6,'MaxFunEvals',1000);
 
 if tune_aerosol_k
@@ -560,11 +562,11 @@ if tune_aerosol_k
 	aerosol_k=x(2);
 else
 	if tune_z_mixed
-		x = fmincon(@tunefunc,[1e3 z_mixed],[],[],[],[],0,1.77e6,[],fitoptions);
+		x = fmincon(@tunefunc,[1e3 z_mixed],[],[],[],[],[0 0],[1.77e6 4000],[],fitoptions);
 		z_mixed=x(2);
 		ocean_diffusivity=x(1);
 	else
-		ocean_diffusivity = fmincon(@tunefunc,1e3,[],[],[],[],0,1.77e6,[],fitoptions);
+		ocean_diffusivity = fmincon(@tunefunc,1e3,[],[],[],[],[0 0],[1.77e6 4000],[],fitoptions);
 	end	
 end
 	

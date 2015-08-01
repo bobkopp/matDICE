@@ -4,7 +4,7 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 %
 %
 %
-% Last updated by  Bob Kopp, robert-dot-kopp-at-rutgers-dot-edu, Mon Mar 4 17:54:50 EST 2013
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Fri Jul 31 17:07:50 EDT 2015
 
 	Nscenarios = length(p.T2xCO2);
 
@@ -119,7 +119,7 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 		if consttcre == 0
 			calcnexttemperature = @(Atm,Ocean,Forcing) [Atm+c1*(Forcing-lam.*Atm-c3*(Atm-Ocean)) Ocean+c4*(Atm-Ocean)];
 		else
-			calcnexttemperature = @(Atm,Ocean,Emissions) [Atm+consttcre*Emissions Ocean+c4*(Atm-Ocean)];
+			calcnexttemperature = @(Atm,Ocean,Emissions) [Atm+consttcre.*Emissions Ocean+c4*(Atm-Ocean)];
 		end
 	end
 	calcoutput_gross = @(TFP,Kapital,Labor) TFP .* Labor.^(1-gama) .* Kapital.^(gama);

@@ -1,13 +1,13 @@
-function [c1,c3,c4,totForcing,Tatm,Tocean,GISS_temp,rss]=TuneDICEClimateModel(climsens,aerosol_k,c1,c3,c4,FCO22x,dt,focean,z_mixed,Cp_mixed,z_deep,sbconst,ocean_diffusivity);
+function [c1,c3,c4,totForcing,Tatm,Tocean,GISS_temp,rss,GISS_years]=TuneDICEClimateModel(climsens,aerosol_k,c1,c3,c4,FCO22x,dt,focean,z_mixed,Cp_mixed,z_deep,sbconst,ocean_diffusivity,Tocean0);
 
 %
 %
-% Last updated by Robert E. Kopp rkopp-at-alumni.caltech.edu, 17 April 2012
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Fri Jul 31 16:23:01 EDT 2015
 
 defval('climsens',3);
 defval('aerosol_k',1);
 defval('FCO22x',3.7127);
-defval('dt',1);
+defval('dt',10);
 
 defval('focean',0.7);
 defval('z_mixed',100);
@@ -23,8 +23,9 @@ defval('c1',(1-.70^dt)/lam);
 defp=DICEParameters;
 defval('c3',defp.c3);
 defval('c4',defp.c4);
+defval('Tocean0',0);
 calcnexttemperature = @(Atm,Ocean,Forcing,c1,c3,c4) [Atm+c1*(Forcing-lam.*Atm-c3*(Atm-Ocean)) Ocean+c4*(Atm-Ocean)];
-
+        
 [GISS_years,GISS_LLGHG,GISS_Aerosols,GISS_OtherRF,GISS_temp]=GetGISS(dt);
 totForcing = GISS_LLGHG+GISS_Aerosols*aerosol_k+GISS_OtherRF;
 
@@ -33,13 +34,15 @@ keyboard
 fitoptions=optimset('Display','iter','algorithm','sqp','TolX',1e-10,'TolFun',1e-10);
 
 
-	x = fmincon(@tunefunc,[c3 c3*z_mixed/z_deep./lam],[],[],[],[],[0 0],[100 100],[],fitoptions);
+	x = fmincon(@tunefunc,[c3 c4],[],[],[],[],[0 0],[1 1],[],fitoptions);
 	
 	if nargout>2
 		[rss,Tatm,Tocean]=tunefunc(x);
 	end	
 	c3=x(1);
-	c4=x(1)*5/31;
+%c4=x(1)*5/31;
+c4=x(2);
+
 	
 	function [rss,Tatm,Tocean]=tunefunc(x)
 		Tatm(1) = 0; Tocean(1) = 0;
@@ -585,6 +588,16 @@ GISS_temp0 = [   -27
     44
     57
     63]/100;
+
+
+GISS_LLGHG0 = GISS_LLGHG0(41:end);
+GISS_Aerosols0 = GISS_Aerosols0(41:end);
+GISS_OtherRF0 = GISS_OtherRF0(41:end);
+    
+GISS_temp0 = GISS_temp0(41:end);
+GISS_temp0 = GISS_temp0 - GISS_temp0(1);
+
+GISS_years0=GISS_years0(41:end);
 
 decadeavgM = zeros(floor(length(GISS_LLGHG0)/dt),length(GISS_LLGHG0));
 for i=1:size(decadeavgM,1)

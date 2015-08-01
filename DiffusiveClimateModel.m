@@ -22,7 +22,8 @@ function [Taccum]=DiffusiveClimateModel(Forcing,Tinits,climsens,ocean_diffusivit
 
 	zs = [z_mixed repmat(z_deep/Ndeepboxes,1,Ndeepboxes)];
 	dists = .5*(zs(1:end-1)+zs(2:end));
-	mixfluxcoeffs = bsxfun(@rdivide,ocean_diffusivity,dists);
+	
+        mixfluxcoeffs = bsxfun(@rdivide,ocean_diffusivity,dists);
 	zmin = min([zs(1:end-1);zs(2:end)],[],1);
 	
 	Nsow = size(Forcing,1);
