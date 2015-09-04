@@ -47,7 +47,7 @@ function [SCCout,scenarios]=SCC(p,SavingsRate,miu,timeslot,damagemodfactor,altmi
 	defval('damagemodfactor',1);
 
 	defval('SavingsRate',p.basesavings);
-	defval('miu',ones(size(p.t))*p.miu_2005);
+	defval('miu',ones(size(p.t))*p.miu0);
 	defval('timeslot',2);
 	defval('altmiu',miu);
 	defval('liability',0);

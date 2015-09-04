@@ -30,8 +30,8 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 %         plot(BaseNoDamages.times,BaseNoDamages.Output,'k');
 %         title('GDP'); ylabel('Output (US$ trillion)');
 %
-% Last updated by  Bob Kopp, robert-dot-kopp-at-rutgers-dot-edu, Tue Aug 7 17:19:55 EDT 2012
-% Copyright (C) 2012 by Robert E. Kopp; distributed under GNU GPL v3
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Thu Sep 03 21:46:21 EDT 2015
+% Copyright (C) 2015 by Robert E. Kopp; distributed under GNU GPL v3
 	
 	doMonotonicity=0;
 	setFixedAbatement = 0;
@@ -72,13 +72,10 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 			i=i+2;
 		elseif strcmpi(varargin{i},'Display');
 			dispmode = varargin{i+1};
-			i=i+2;
-		elseif strcmpi(varargin{i},'useparallel');
-			useparallel = varargin{i+1};
-			i=i+2;
-		elseif strcmpi(varargin{i},'coarseners');
-			coarseners = varargin{i+1};
-			coarseners = sort(coarseners,1,'descend');
+                        i=i+2;
+                elseif strcmpi(varargin{i},'coarseners');
+                    coarseners = varargin{i+1};
+                    coarseners = sort(coarseners,1,'descend');
 			i=i+2;
 		elseif strcmpi(varargin{i},'MaxFunEvals');
 			MaxFunEvals = varargin{i+1};
@@ -106,7 +103,7 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 	p=DICEParameters(spec{:});
 	timesteps=length(p.t);
 	if ~setFixedAbatement
-		FixedAbatement = p.miu_2005;
+		FixedAbatement = p.miu0;
 	end
 
 	if length(basesave)==0
@@ -117,7 +114,7 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 		basesavings = basesave;
 	end
 	if length(baseabate)==0
-		baseabatement = ones(size(p.t)) * p.miu_2005;
+		baseabatement = ones(size(p.t)) * p.miu0;
 	elseif length(baseabate)==1
 		baseabatement = ones(size(p.t)) * baseabate;
 	else
@@ -128,7 +125,6 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 	
 	basesavings=basesavings(:)';baseabatement=baseabatement(:)';
 	[EW,Base] = DICEEconomicModel(p,basesavings,baseabatement,[],incrementalemissions);
-
 	if length(startabate)==0
 		startabate=baseabatement;
 	end
@@ -186,13 +182,13 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 			% first optimize only abatement
 			WelfAbate = @(x) Welfare([basesavings(:) ; Aeq(:,subunlocked)*x]',p,incrementalemissions);
 			
-			monotonicityA = sparse(zeros(length(p.t)));
+			monotonicityA = sparse(zeros(length(subunlocked)));
 			if doMonotonicity
-				for i=1:length(p.t)-1
+				for i=1:length(subunlocked)-1
 					monotonicityA(i,i:i+1) = [1 -1];
 				end
 			end
-			monotonicityB = sparse(zeros(length(p.t),1));
+			monotonicityB = sparse(zeros(length(subunlocked),1));
 			
 			startingPoint = [startabate(:)' ]';
 	%		Lwr = [[p.miu_2005 zeros(1,timesteps-1)] ]';
@@ -225,7 +221,7 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 	%			fitoptions=optimset('Display',dispmode,'TolX',TolX,'TolFun',abs(1e-8*Base.ExpectedWelfare),'MaxFunEval',MaxFunEvals,'Algorithm',algorithm);
 				fitoptions=optimset('Display',dispmode,'MaxFunEval',MaxFunEvals,'Algorithm',algorithm,'UseParallel',useparallel,'TolX',TolX,'TolFun',TolFun);
 	
-				[optm1.coeffs,optm1.fval,optm1.exitflag,optm1.output,optm1.lambda,optm1.grad] = fmincon(WelfAbate,startingPoint(subunlocked),full(monotonicityA(subunlocked,subunlocked)),full(monotonicityB(subunlocked)),[],[],Lwr(subunlocked),Upr(subunlocked),[],fitoptions);
+				[optm1.coeffs,optm1.fval,optm1.exitflag,optm1.output,optm1.lambda,optm1.grad] = fmincon(WelfAbate,startingPoint(subunlocked),full(monotonicityA),full(monotonicityB),[],[],Lwr(subunlocked),Upr(subunlocked),[],fitoptions);
 				xopt = Aeq(:,subunlocked)*optm1.coeffs;
 				xopt = xopt(:)';
 			end
@@ -243,7 +239,7 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 			baseabatement = xopt;
 	
 		end
-		
+
 		if nargout > 2	
 			
 			Aeq2 = [Aeq Aeq*0 ; Aeq*0 Aeq];
@@ -251,21 +247,22 @@ function [Base,OptimAbatement,FullOptim] = matDICE(varargin)
 			% then optimize savings and abatement
 			Welfare2 = @(x) Welfare([Aeq2(:,subunlocked2) * x(:)]',p,incrementalemissions);
 		
-			monotonicityA2 = sparse(zeros(length(p.t)*2));
-			monotonicityA2(length(p.t)+1:end,length(p.t)+1:end)=monotonicityA;
-			monotonicityB2 = sparse(zeros(length(p.t)*2,1));
+			monotonicityA2 = sparse(zeros(length(subunlocked2)));
+			monotonicityA2(length(subunlocked)+1:end,length(subunlocked)+1:end)=monotonicityA;
+			monotonicityB2 = sparse(zeros(length(subunlocked2),1));
 		
-			startingPoint = [basesavings(:)' optm1.coeffs(:)' ]';
-			Lwr = [[basesavings(1) ones(1,timesteps-1)*.01] [p.miu_2005 zeros(1,timesteps-1)] ]';
+                        basesavings=basesavings(:)';
+			startingPoint = [basesavings(subunlocked) optm1.coeffs(:)' ]';
+			Lwr = [[basesavings(1) ones(1,timesteps-1)*.01] [p.miu0 zeros(1,timesteps-1)] ]';
 			if length(p.limmiu)==1
-				Upr = [[basesavings(1) ones(1,timesteps-1)*.9] [p.miu_2005 (ones(1,timesteps-1) * p.limmiu)] ]';
+				Upr = [[basesavings(1) ones(1,timesteps-1)*.9] [p.miu0 (ones(1,timesteps-1) * p.limmiu)] ]';
 			else
-				Upr = [[basesavings(1) ones(1,timesteps-1)*.9] [p.miu_2005 p.limmiu(2:end)] ]';
+				Upr = [[basesavings(1) ones(1,timesteps-1)*.9] [p.miu0 p.limmiu(2:end)] ]';
 			end
 %			fitoptions=optimset('Display',dispmode,'TolX',1e-4,'TolFun',abs(1e-8*Base.ExpectedWelfare),'MaxFunEval',MaxFunEvals,'Algorithm',algorithm);
 %			fitoptions=optimset('Display',dispmode,'TolX',1e-6,'TolFun',1e-8,'MaxFunEval',MaxFunEvals,'Algorithm',algorithm);
-			
-			[optm2.coeffs,optm2.fval,optm2.exitflag,optm2.output,optm2.lambda,optm2.grad] = fmincon(Welfare2,startingPoint(subunlocked2),full(monotonicityA2(subunlocked2,subunlocked2)),full(monotonicityB2(subunlocked2)),[],[],Lwr(subunlocked2),Upr(subunlocked2),[],fitoptions);
+
+[optm2.coeffs,optm2.fval,optm2.exitflag,optm2.output,optm2.lambda,optm2.grad] = fmincon(Welfare2,startingPoint,full(monotonicityA2),full(monotonicityB2),[],[],Lwr(subunlocked2),Upr(subunlocked2),[],fitoptions);
 				optm2.coeffs = Aeq2(:,subunlocked2)*optm2.coeffs;
 				optm2.coeffs = optm2.coeffs(:)';
 	
@@ -295,8 +292,5 @@ function wlf=Welfare(x,p,incrementalemissions)
 	x=x(:)';
 	lentime = length(p.t);
 	wlf = (-1 * DICEEconomicModel(p,x(1:lentime),x(lentime+1:end),[],incrementalemissions));
-	
-%test code for Octave
-%endfunction
 
 end

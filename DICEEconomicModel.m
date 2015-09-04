@@ -4,7 +4,7 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 %
 %
 %
-% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Fri Jul 31 17:07:50 EDT 2015
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Fri Sep 04 00:17:27 EDT 2015
 
 	Nscenarios = length(p.T2xCO2);
 
@@ -41,13 +41,13 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 	end
 
 	b = p.b^((t(2)-t(1))/10);
-	c1 = p.c1;
+	c1 = p.c1(:);
 	c3 = p.c3;
 	c4 = p.c4;
 	gama = p.gama;
 	expcost2 = p.expcost2;
 	FCO22x = p.FCO22x;
-	matPI = p.matPI;
+	matPI = p.mateq;
 	plantlife=p.plantlife;
 	earlyretcost = p.earlyretcost;
 	rr=p.rr;
@@ -101,7 +101,14 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 	liabilityfloor = p.liabilityfloor;
 	
 	miu = bsxfun(@plus,miu,incrementalmiu);
-	
+        
+        overrideCO2=p.overrideCO2;
+        overrideForcing=p.overrideForcing;
+        overrideCarbon=p.overrideCarbon;
+        
+        dooverrideCarbon=(length(overrideCarbon)>0);
+        dooverrideCO2=(length(overrideCO2)>0);
+        dooverrideForcing=(length(overrideForcing)>0);	
 	
 	calcnextmassdist = @(mass0,emissions) mass0 * b + [emissions zeros(Nscenarios,2)]; 
 	if p.use_new_climate
@@ -117,13 +124,13 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 	else
 		Ndeepboxes = 1;
 		if consttcre == 0
-			calcnexttemperature = @(Atm,Ocean,Forcing) [Atm+c1*(Forcing-lam.*Atm-c3*(Atm-Ocean)) Ocean+c4*(Atm-Ocean)];
+			calcnexttemperature = @(Atm,Ocean,Forcing) [Atm+c1.*(Forcing-lam.*Atm-c3.*(Atm-Ocean)) Ocean+c4.*(Atm-Ocean)];
 		else
 			calcnexttemperature = @(Atm,Ocean,Emissions) [Atm+consttcre.*Emissions Ocean+c4*(Atm-Ocean)];
 		end
 	end
-	calcoutput_gross = @(TFP,Kapital,Labor) TFP .* Labor.^(1-gama) .* Kapital.^(gama);
-	calcabatecost = @(PartFraction,CostFactor,Mitigation) (PartFraction^(1-expcost2))*(bsxfun(@times,CostFactor,Mitigation.^expcost2));
+	calcoutput_gross = @(TFP,Kapital,Labor) TFP .* (Labor/1000).^(1-gama) .* Kapital.^(gama);
+	calcabatecost = @(PartFraction,CostFactor,Mitigation) (PartFraction.^(1-expcost2))*(bsxfun(@times,CostFactor,Mitigation.^expcost2));
 	calcco2forcing = @(AtmCO2) FCO22x*log2((AtmCO2+1e-9)/matPI);
 	calcearlyretcost = @(DeltaMitigation,sigma,dt) (abs(DeltaMitigation)>dt./plantlife).*0.5*(max(DeltaMitigation-dt./plantlife).^2).*plantlife.*sigma.*earlyretcost;
 	if isprop(p,'calcdamagesstr')
@@ -139,7 +146,7 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 	else
 		Tocean = repmat(reshape(p.Tocean0,1,1,[]),[Nscenarios,1,1]);
 	end
-	MassDist(1,1:3,1:Nscenarios) = repmat([p.mat2005 p.mu2005 p.ml2005],[1 1 Nscenarios]);
+	MassDist(1,1:3,1:Nscenarios) = repmat([p.mat0 p.mu0 p.ml0],[1 1 Nscenarios]);
 	ForcingNonCO2(:,1) = repmat(forcoth(1),Nscenarios,1)+incrementalforcing(:,1);
 	Forcing(:,1) = squeeze(calcco2forcing(MassDist(1,1,:)))+ForcingNonCO2(:,1);
 	CumulativeEmissions(:,1) = zeros(Nscenarios,1);
@@ -150,31 +157,47 @@ function [ExpectedWelfare,scenario] = DICEEconomicModel(p,SavingsRate,miu,damage
 	Capital(:,1) = Capital(:,1) + incrementalcapital(1);
 	EarlyRetirementCost(:,1) = zeros(Nscenarios,1);
 	NotCrashed(:,1) = ones(Nscenarios,1);
+        
+        if dooverrideForcing
+            Forcing(:,1)=ones(size(Forcing))*overrideForcing(1);
+        end
+        if dooverrideCO2
+            MassDist(1,1,1:Nscenarios) = repmat(overrideCO2(1),[1 1 Nscenarios]);
+        end
 	
 for i=1:length(t)
 	
 		if i>1
 			if Nscenarios > 1
-				MassDist(i,1:3,1:Nscenarios) = reshape(calcnextmassdist(squeeze(MassDist(i-1,:,:))',Emissions(:,i-1))',1,3,Nscenarios);
+				MassDist(i,1:3,1:Nscenarios) = reshape(calcnextmassdist(squeeze(MassDist(i-1,:,:))',CEmissionsPerPeriod(:,i-1))',1,3,Nscenarios);
 				MassDist(i,:,:) = MassDist(i,:,:).*(MassDist(i,:,:)>0);
 			else
-				MassDist(i,1:3,1) = calcnextmassdist(MassDist(i-1,:),Emissions(i-1));
+				MassDist(i,1:3,1) = calcnextmassdist(MassDist(i-1,:),CEmissionsPerPeriod(i-1));
 				MassDist(i,1:3,1) = MassDist(i,:).*(MassDist(i,:)>0);
 			end
+                       if dooverrideCO2
+                            MassDist(i,1,:) = overrideCO2(i);
+                        end
+
 			forcothmiu(:,i) = miu(:,i-1)*forcothmiufactor;
 			forcothmiu(:,i) = (forcothmiu(:,i)<=forcothlimmiu).*forcothmiu(:,i) + forcothlimmiu.*(forcothmiu(:,i)>forcothlimmiu);
 			ForcingNonCO2(:,i)=real((forcoth(i)*(1-forcothmiu(:,i)))+incrementalforcing(:,i));
 			Forcing(:,i) = real(calcco2forcing(squeeze(MassDist(i,1,:)))+ForcingNonCO2(:,i));
-			if consttcre == 0
+                       
+                        if dooverrideForcing
+                            Forcing(:,i)=overrideForcing(i);
+                        end
+ 			if consttcre == 0
 				temps = real(calcnexttemperature(Tatm(:,i-1),Tocean(:,i-1,:),.5*(Forcing(:,i)+Forcing(:,i-1))));
-				CumulativeEmissions(:,i) = CumulativeEmissions(:,i-1) + Emissions(:,i-1);
+				CumulativeEmissions(:,i) = CumulativeEmissions(:,i-1) + CEmissionsPerPeriod(:,i-1);
 			else
-				temps = real(calcnexttemperature(Tatm(:,i-1),Tocean(:,i-1,:),Emissions(:,i-1)));
-				CumulativeEmissions(:,i) = CumulativeEmissions(:,i-1) + Emissions(:,i-1);
+				temps = real(calcnexttemperature(Tatm(:,i-1),Tocean(:,i-1,:),CEmissionsPerPeriod(:,i-1)));
+				CumulativeEmissions(:,i) = CumulativeEmissions(:,i-1) + CEmissionsPerPeriod(:,i-1);
 			end
 
 			% hard upper limit to carbon
-			miu(:,i) = miu(:,i) .* (CumulativeEmissions(:,i)<fosslim) + (CumulativeEmissions(:,i)>=fosslim);
+                        CumulativeFossilEmissions=sum(FossilEmissions,2)*12/44*(t(2)-t(1));
+			miu(:,i) = miu(:,i) .* (CumulativeFossilEmissions<fosslim) + (CumulativeFossilEmissions>=fosslim);
 			EarlyRetirementCost(:,i) = calcearlyretcost((miu(:,i)-miu(:,i-1))/partfract(i),sigma(i),t(2)-t(1));
 
 			Tatm(:,i) = temps(:,1); Tocean(:,i,:) = permute(temps(:,2:end),[1 3 2]);
@@ -193,11 +216,16 @@ for i=1:length(t)
 	
 		Output_Gross(:,i) = calcoutput_gross(al(:,i),Capital(:,i),Population(:,i));
 		
-		FossilEmissions_Gross(:,i) = (t(2)-t(1))*sigma(i).*Output_Gross(:,i);
+		FossilEmissions_Gross(:,i) = sigma(i).*Output_Gross(:,i);
 		FossilEmissions(:,i) = FossilEmissions_Gross(:,i).*(1-miu(:,i));
-		LandEmissions_Gross(:,i) = repmat(etree(i)*(t(2)-t(1))/10,Nscenarios,1);
+		LandEmissions_Gross(:,i) = repmat(etree(i),Nscenarios,1);
 		LandEmissions(:,i) = LandEmissions_Gross(:,i) .*(1-miu(:,i));
-		Emissions(:,i) = FossilEmissions(:,i) + LandEmissions(:,i) + incrementalemissions(i);  
+		Emissions(:,i) = FossilEmissions(:,i) + LandEmissions(:,i) + incrementalemissions(i);
+                if dooverrideCarbon
+                    Emissions(:,i)=ones(size(Emissions(:,i)))*overrideCarbon(i);
+                end
+ 
+                CEmissionsPerPeriod(:,i) = Emissions(:,i)*(t(2)-t(1))*12/44;
 
 		ClimateDamages(:,i) = 1 - (1 - damagemodfactor*calcdamages(abs(Tatm(:,i)),t(i),dTatm(:,i),Output_Gross(:,i),[preTatm Tatm],Population(i))).^(1-dam_fcapital-dam_futility);
 		AbatementCost(:,i) = calcabatecost(partfract(i),cost1(i),miu(:,i)) + EarlyRetirementCost(:,i);
@@ -356,6 +384,7 @@ for i=1:length(t)
 		scenario.FossilEmissions = FossilEmissions;
 		scenario.Emissions = Emissions;
 		scenario.Emissions_Gross = Emissions_Gross;
+                scenario.CumulativeEmissions = CumulativeEmissions;
 		scenario.Tatm = Tatm;
 		scenario.Tocean = Tocean;
 		scenario.ppmCO2 = ppmCO2;

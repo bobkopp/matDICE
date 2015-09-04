@@ -29,8 +29,8 @@ function [Y,L,E,K,eland,forcoth,al,sigma,outyears]=DICEFitRefScenario(years,GDP,
 %	p=DICEParameters('prstp',0.03,'elasmu',0,spec{:});
 %	Ref=KDICE(spec{:},'aa2',0);
 %
-% Last updated by  Bob Kopp, robert-dot-kopp-at-rutgers-dot-edu, Mon Mar 4 18:20:03 EST 2013
-% Copyright (C) 2013 by Robert E. Kopp; distributed under GNU GPL v3
+% Last updated by Robert Kopp, robert-dot-kopp-at-rutgers-dot-edu, Thu Sep 03 21:45:47 EDT 2015
+% Copyright (C) 2015 by Robert E. Kopp; distributed under GNU GPL v3
 
 defp = DICEParameters;
 defval('tims',defp.t);
@@ -47,7 +47,7 @@ L = exp(interp1(years,log(Population+1e-9),tims,'linear','extrap'));
 
 E = exp(interp1(years,log(IndustrialCO2+1e-9),tims,'linear','extrap'));
 
-eland = exp(interp1(years,log(LandCO2+1e-9),tims,'linear','extrap'))*10;
+eland = exp(interp1(years,log(LandCO2+1e-9),tims,'linear','extrap'));
 
 forcoth = exp(interp1(years,log(nonCO2forcings+1e-9),tims,'linear','extrap')); 
 
@@ -61,15 +61,15 @@ al     = zeros(1,length(tims));
 al(1)  = defp.a0;
 
 savings = 0.2;
-K(1) = (Y(1)/al(1)/(L(1)^(1-defp.gama)))^(1/defp.gama);
+K(1) = (Y(1)/al(1)/((L(1)/1000)^(1-defp.gama)))^(1/defp.gama);
 
 for t = 2:length(tims);
 
     K(t) = K(t-1)*(1-defp.dk)^(tims(t)-tims(t-1)) + savings*Y(t-1)*(tims(t)-tims(t-1));
 
-    al(t) = Y(t)/(K(t)^defp.gama * L(t)^(1-defp.gama));
+    al(t) = Y(t)/(K(t)^defp.gama * (L(t)/1000)^(1-defp.gama));
 end;
-sigma = E./Y/(1-defp.miu_2005);
+sigma = E./Y/(1-defp.miu0);
 
 
 %--------------------------------------------------------------------------
