@@ -83,6 +83,7 @@ function p=DICEParameters(varargin)
     
     p.c3=.088; % Transfer coefficient upper to deep ocean
     p.c4=.025; % Transfer coefficient for lower level
+    p.c4toc3=p.c4/p.c3; % ratio of deep to shallow heat capacity (this seems quite large in DICE default)
     
     p.FCO22x = 3.8; % Forcings of equilibrium CO2 doubling (Wm-2)       
     
@@ -181,7 +182,8 @@ function p=DICEParameters(varargin)
     
     p.b=[(1-p.b12) p.b12 0 ; b21 1-b21-p.b23 p.b23 ; 0 b32 1-b32]; 
     p.sig0 = p.e0/(p.q0-(1-p.miu0));
-    
+    p.c4=p.c4toc3.*p.c3; % preserve ratio of deep to shallow heat capacity
+
 
     %%%%
     
